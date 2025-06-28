@@ -17,7 +17,7 @@ defmodule TerminalphxWeb.Router do
   scope "/", TerminalphxWeb do
     pipe_through :browser
 
-    get "/", PageController, :home
+    live "/", TerminalLive
   end
 
   # Other scopes may use custom stacks.
