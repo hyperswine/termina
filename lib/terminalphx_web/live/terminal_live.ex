@@ -22,6 +22,8 @@ defmodule TerminalphxWeb.TerminalLive do
      |> assign(:pane_results, [])
      |> assign(:last_command, "")
      |> assign(:last_search, "")
+     |> assign(:key_history, [])
+     |> assign(:show_key_visualizer, false)
     }
   end
 
@@ -122,6 +124,20 @@ defmodule TerminalphxWeb.TerminalLive do
             }
         end
     end
+  end
+
+  @impl true
+  def handle_event("key_press", %{"key" => key}, socket) do
+    # Add to key history for visualizer
+    key_history = [key | socket.assigns[:key_history] || []] |> Enum.take(10)
+
+    {:noreply, assign(socket, :key_history, key_history)}
+  end
+
+  @impl true
+  def handle_event("toggle_key_visualizer", _, socket) do
+    show = !socket.assigns.show_key_visualizer
+    {:noreply, assign(socket, :show_key_visualizer, show)}
   end
 
   # Private functions

@@ -29,6 +29,9 @@ let Hooks = {}
 Hooks.Terminal = {
   mounted() {
     this.handleKeyDown = (event) => {
+      // Track all key presses for visualizer
+      this.pushEvent("key_press", {key: event.key});
+
       // Ctrl+K or Cmd+K to toggle modal
       if ((event.ctrlKey || event.metaKey) && event.key === 'k') {
         event.preventDefault();
@@ -39,6 +42,12 @@ Hooks.Terminal = {
       if (event.key === 'Escape') {
         event.preventDefault();
         this.pushEvent("close_modal", {});
+      }
+
+      // Ctrl+Shift+K for key visualizer
+      if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key === 'K') {
+        event.preventDefault();
+        this.pushEvent("toggle_key_visualizer", {});
       }
     }
 
