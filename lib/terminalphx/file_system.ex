@@ -217,6 +217,34 @@ defmodule Terminalphx.FileSystem do
     end)
   end
 
+  @doc """
+  Lists files and directories recursively up to a specified nesting level.
+  """
+  def list_directory_recursive(path \\ @default_cwd, max_nesting \\ 2, current_level \\ 0) do
+    normalized_path = normalize_path(path)
+
+    files = from(n in Node,
+      where: n.parent_id == subquery(
+        from(p in Node, where: p.path == ^normalized_path, select: p.id)
+      ),
+      order_by: [asc: n.is_directory, asc: n.name]
+    )
+    |> Repo.all()
+
+    if current_level < max_nesting do
+      Enum.map(files, fn file ->
+        if file.is_directory and current_level < max_nesting do
+          children = list_directory_recursive(file.path, max_nesting, current_level + 1)
+          Map.put(file, :children, children)
+        else
+          Map.put(file, :children, [])
+        end
+      end)
+    else
+      Enum.map(files, fn file -> Map.put(file, :children, []) end)
+    end
+  end
+
   # Private functions
 
   defp normalize_path(""), do: @default_cwd

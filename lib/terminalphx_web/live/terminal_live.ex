@@ -55,23 +55,35 @@ defmodule TerminalphxWeb.TerminalLive do
 
   @impl true
   def handle_event("input_change", %{"command" => command}, socket) do
-    {mode, cleaned_command} = determine_mode(command)
+    {mode, cleaned_command} = determine_mode_from_input(command, socket.assigns.mode)
 
     socket =
       socket
-      |> assign(:command_input, command)
+      |> assign(:command_input, cleaned_command)
       |> assign(:mode, mode)
 
     socket = case mode do
       :search when cleaned_command != "" ->
         results = FileSystem.search(cleaned_command)
-        assign(socket, :search_results, results)
+        socket
+        |> assign(:search_results, results)
+        |> assign(:pane_results, [])
 
       :help when cleaned_command == "" ->
-        assign(socket, :search_results, get_help_options())
+        socket
+        |> assign(:search_results, get_help_options())
+        |> assign(:pane_results, [])
 
       _ ->
-        assign(socket, :search_results, [])
+        if mode != socket.assigns.mode do
+          # Mode changed, clear results
+          socket
+          |> assign(:search_results, [])
+          |> assign(:pane_results, [])
+        else
+          # Same mode, keep search results if they exist
+          socket
+        end
     end
 
     {:noreply, socket}
@@ -79,7 +91,14 @@ defmodule TerminalphxWeb.TerminalLive do
 
   @impl true
   def handle_event("execute_command", %{"command" => command}, socket) do
-    {mode, cleaned_command} = determine_mode(command)
+    # For execution, we need the full command with prefix to determine mode
+    full_command = case socket.assigns.mode do
+      :search -> ">" <> command
+      :shell -> "$" <> command
+      :help -> command
+    end
+
+    {mode, cleaned_command} = determine_mode(full_command)
 
     socket = case mode do
       :search -> handle_search_command(cleaned_command, socket)
@@ -88,16 +107,18 @@ defmodule TerminalphxWeb.TerminalLive do
     end
 
     # Add to history and reset input only if modal is still open
-    history = [command | socket.assigns.command_history]
+    history = [full_command | socket.assigns.command_history]
 
     final_socket = socket
     |> assign(:command_history, Enum.take(history, 10))
 
-    # Only reset input and mode if modal is still open (i.e., editor wasn't opened)
+    # Only reset input if modal is still open, but preserve mode
     final_socket = if socket.assigns.modal_open do
+      new_input = ""  # Clear input after execution
+
       final_socket
-      |> assign(:command_input, ">")
-      |> assign(:mode, :search)
+      |> assign(:command_input, new_input)
+      # Don't reset mode - keep current mode
     else
       final_socket
     end
@@ -180,6 +201,22 @@ defmodule TerminalphxWeb.TerminalLive do
 
   # Private functions
 
+  defp determine_mode_from_input(command, current_mode) do
+    cond do
+      String.starts_with?(command, ">") ->
+        {:search, String.slice(command, 1..-1//1) |> String.trim()}
+      String.starts_with?(command, "$") ->
+        {:shell, String.slice(command, 1..-1//1) |> String.trim()}
+      command == "" ->
+        {:help, ""}
+      # If user types without prefix and we're in a specific mode, stay in that mode
+      current_mode in [:search, :shell] ->
+        {current_mode, command}
+      true ->
+        {:help, command}
+    end
+  end
+
   defp determine_mode(command) do
     cond do
       String.starts_with?(command, ">") -> {:search, String.slice(command, 1..-1//1) |> String.trim()}
@@ -259,17 +296,44 @@ defmodule TerminalphxWeb.TerminalLive do
   end
 
   defp handle_ls_command([], socket) do
-    files = FileSystem.list_directory(socket.assigns.current_directory)
-    {:ok, %{type: :file_list, files: files, path: socket.assigns.current_directory}}
+    files = FileSystem.list_directory_recursive(socket.assigns.current_directory, 2)
+    {:ok, %{type: :file_list_recursive, files: files, path: socket.assigns.current_directory, nesting: 2}}
   end
 
-  defp handle_ls_command([path], socket) do
-    abs_path = resolve_path(path, socket.assigns.current_directory)
+  defp handle_ls_command(args, socket) do
+    {path, nesting} = parse_ls_args(args)
+    abs_path = if path, do: resolve_path(path, socket.assigns.current_directory), else: socket.assigns.current_directory
+
     case FileSystem.cd(abs_path) do
       {:ok, _} ->
-        files = FileSystem.list_directory(abs_path)
-        {:ok, %{type: :file_list, files: files, path: abs_path}}
+        files = FileSystem.list_directory_recursive(abs_path, nesting)
+        {:ok, %{type: :file_list_recursive, files: files, path: abs_path, nesting: nesting}}
       {:error, msg} -> {:error, msg}
+    end
+  end
+
+  # Parse ls arguments to extract path and nesting level
+  defp parse_ls_args(args) do
+    {nesting, remaining_args} = extract_nesting_arg(args, 2)
+    path = case remaining_args do
+      [] -> nil
+      [p] -> p
+      _ -> List.first(remaining_args)
+    end
+    {path, nesting}
+  end
+
+  defp extract_nesting_arg([], default), do: {default, []}
+  defp extract_nesting_arg([arg | rest], default) do
+    if String.starts_with?(arg, "--nesting=") do
+      nesting_str = String.slice(arg, 10..-1//1)
+      case Integer.parse(nesting_str) do
+        {nesting, _} when nesting >= 0 -> {nesting, rest}
+        _ -> {default, [arg | rest]}
+      end
+    else
+      {nesting, remaining} = extract_nesting_arg(rest, default)
+      {nesting, [arg | remaining]}
     end
   end
 
@@ -317,13 +381,19 @@ defmodule TerminalphxWeb.TerminalLive do
 
   defp handle_edit_command([path], socket) do
     abs_path = resolve_path(path, socket.assigns.current_directory)
-    case FileSystem.cat(abs_path) do
-      {:ok, content} -> {:edit, abs_path, content}
-      {:error, _} ->
-        # Create file if it doesn't exist
-        case FileSystem.touch(abs_path, "") do
-          {:ok, _} -> {:edit, abs_path, ""}
-          {:error, msg} -> {:error, msg}
+
+    # Check if it's a valid file path (must have an extension)
+    case Path.extname(abs_path) do
+      "" -> {:error, "edit command only works with files (must have an extension)"}
+      _ ->
+        case FileSystem.cat(abs_path) do
+          {:ok, content} -> {:edit, abs_path, content}
+          {:error, _} ->
+            # Create file if it doesn't exist
+            case FileSystem.touch(abs_path, "") do
+              {:ok, _} -> {:edit, abs_path, ""}
+              {:error, msg} -> {:error, msg}
+            end
         end
     end
   end
@@ -344,5 +414,20 @@ defmodule TerminalphxWeb.TerminalLive do
       %{name: "Create file", path: "$ touch <file>", is_directory: false, content: "Create new file or directory"},
       %{name: "Remove file", path: "$ rm <file>", is_directory: false, content: "Delete file or directory"}
     ]
+  end
+
+  # Private helper functions for rendering
+
+  defp flatten_recursive_files(files, level) do
+    Enum.flat_map(files, fn file ->
+      file_with_indent = Map.put(file, :indent, level)
+      children = Map.get(file, :children, [])
+
+      if file.is_directory and length(children) > 0 do
+        [file_with_indent | flatten_recursive_files(children, level + 1)]
+      else
+        [file_with_indent]
+      end
+    end)
   end
 end

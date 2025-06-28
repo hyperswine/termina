@@ -1,177 +1,48 @@
-# Terminal Phoenix
+# Termina
 
-A spotlight-like terminal interface built with Phoenix LiveView and styled with Tailwind CSS.
+A spotlight + shell like fusion concept GUI. Also has a text editor and some mini apps like a key visualizer as we type.
+The basic GUI will be the main desktop like shell with nothing there but a dynamic background.
+Press CTL + K to open the spotlight like thing which is like a modal similar to the actual spotlight or raycast.
+The modal would show a wide text field like
 
-## Features
+[>                                 ]
+| Getting Started
+| Previous Command: ls
+| Previous Search: file.txt
 
-### 🔍 Spotlight-Style Interface
-- Press `Ctrl+K` (or `Cmd+K` on Mac) to open the terminal modal
-- Press `Escape` to close the modal
-- Clean, modern UI with gradient background and backdrop blur effects
+with a drop down
 
-### 🔥 Three Operating Modes
+[$                                 ]
+| ls: /home
+|       readme.txt
+|       file.txt
+|       newdir/
+|         readme.txt
+|         ...
 
-#### 1. Search Mode (`>`)
-- Type `>` followed by your search term
-- Searches through file names and content
-- Real-time search results as you type
-- Example: `>config` finds files containing "config"
+Has the basic features of searching for files, inputting CLI Commands like ls.
+Has a mini filesystem of the type
 
-#### 2. Shell Mode (`$`)
-- Type `$` followed by your command
-- Supports common Unix-like commands:
-  - `ls [path]` - List files and directories
-  - `cd [path]` - Change current directory
-  - `cat <file>` - Display file contents
-  - `show <file>` - Alias for cat
-  - `rm <file>` - Remove file or directory
-  - `touch <file>` - Create new file or directory
-  - `edit <file>` - Open file in the built-in editor
+File : Directory [File] | File Content
+Content : String
 
-#### 3. Help Mode (empty input)
-- Leave the input empty to see available commands and options
-- Shows quick reference for all available functionality
+With phoenix ecto sqlite persistence.
 
-### 📁 Virtual File System
-- Persistent file system stored in SQLite database
-- Hierarchical directory structure
-- Support for both files and directories
-- File content is searchable
+List of commands:
+ls <path?> - creates a new pane in the dropdown menu below the modal and shows the list of files in the cwd
+cd <path?> - change cwd, to /home if path not specified
+cat <path> - show file content
+show <path> - alias for cat
+rm <path> - remove a file, including a directory. No -r required or rmdir required
+touch <path> - creates a new file or directory, including any parent directories if needed. E.g. touch /home/mydir or touch /home/file.txt
+edit <path> - opens up the text editor on the desktop view and closes the modal
 
-### ✨ Built-in Text Editor
-- Full-screen text editor opens when using `edit` command
-- Syntax highlighting ready (can be extended)
-- Save functionality with `Ctrl+S`
-- Clean, minimalist interface
+Note some of the commands like cat, touch, edit only work on File not Directory. So if the path refers to directory then it will print an error
 
-## Getting Started
+The modal search dialog view has two modes
+The first mode is the ">" mode. Which is an intelligent file search mode that can search based on filenames and content as well as any commands
+The second mode is the "$" mode. Which is the pure shell mode. Here we can run commands like ls directly
+By default the modal text field is auto filled with ">" for the intelligent file search. The user can easily backspace and write $ instead
+Without the > or $ mode we have the empty mode. In the empty mode we have the "help mode" which shows a dropdown pane of common options to do
 
-### Prerequisites
-- Elixir 1.15+
-- Phoenix 1.8+
-- PostgreSQL (or SQLite for development)
-
-### Installation
-
-1. Clone the repository
-2. Install dependencies:
-   ```bash
-   mix deps.get
-   ```
-
-3. Create and setup the database:
-   ```bash
-   mix ecto.create
-   mix ecto.migrate
-   mix run priv/repo/seeds.exs
-   ```
-
-4. Install frontend dependencies:
-   ```bash
-   mix assets.setup
-   ```
-
-5. Start the Phoenix server:
-   ```bash
-   mix phx.server
-   ```
-
-6. Visit [`localhost:4000`](http://localhost:4000)
-
-## Usage Examples
-
-### Basic Navigation
-1. Press `Ctrl+K` to open terminal
-2. Type `$ ls` to see files in current directory
-3. Type `$ cd /home` to change directory
-4. Type `$ cat welcome.txt` to read a file
-
-### File Operations
-1. `$ touch myfile.txt` - Create a new file
-2. `$ edit myfile.txt` - Open file in editor
-3. `$ rm myfile.txt` - Delete the file
-
-### Search Examples
-1. `> txt` - Find all files with "txt" in name or content
-2. `> Phoenix` - Find files containing "Phoenix"
-3. `> config` - Find configuration files
-
-## Architecture
-
-### Backend
-- **Phoenix LiveView** for real-time UI updates
-- **Ecto** for database operations
-- **Custom FileSystem context** for file operations
-- **SQLite/PostgreSQL** for data persistence
-
-### Frontend
-- **Tailwind CSS** for styling
-- **JavaScript hooks** for keyboard shortcuts
-- **HEEx templates** for reactive UI
-- **CSS animations** for smooth transitions
-
-### Key Components
-- `TerminalLive` - Main LiveView module
-- `FileSystem` - Context for file operations
-- `FileSystem.Node` - Schema for files and directories
-
-## File System Structure
-
-The virtual file system starts with:
-```
-/
-└── home/
-    ├── welcome.txt
-    ├── readme.md
-    └── config.json
-```
-
-## Customization
-
-### Adding New Commands
-Add new commands in `TerminalLive.handle_shell_command/2`:
-
-```elixir
-defp handle_shell_command(command, socket) do
-  [cmd | args] = String.split(command, " ", trim: true)
-
-  result = case cmd do
-    "ls" -> handle_ls_command(args, socket)
-    "my_command" -> handle_my_command(args, socket)  # Add here
-    # ... existing commands
-  end
-end
-```
-
-### Styling
-The interface uses Tailwind CSS. Key areas to customize:
-- Background gradients in the main template
-- Modal styling and backdrop effects
-- Color schemes for different modes
-- Animation timing and effects
-
-## Development
-
-### Database Migrations
-Create new migrations:
-```bash
-mix ecto.gen.migration add_feature
-```
-
-### Adding Features
-1. Update the FileSystem context for new operations
-2. Add corresponding handlers in TerminalLive
-3. Update the UI template as needed
-4. Add tests for new functionality
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests
-5. Submit a pull request
-
-## License
-
-This project is open source and available under the MIT License.
+The UI looks quite modern like apple's spotlight. The desktop view also looks minimal and is basically just a changing gradient color that is meant to be replaced with a mini app like the text editor or key visualizer when called by the modal searcher
