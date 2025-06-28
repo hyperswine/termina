@@ -1,16 +1,15 @@
 # Terminal Phoenix
 
-A spotlight-like terminal interface built with Phoenix LiveView and styled with Tailwind CSS.
+A spotlight-like terminal interface built with Phoenix.
 
 ## Features
 
-### 🔍 Spotlight-Style Interface
+### Spotlight-Style Interface
 
 - Press `Ctrl+K` (or `Cmd+K` on Mac) to open the terminal modal
 - Press `Escape` to close the modal
-- Clean, modern UI with gradient background and backdrop blur effects
 
-### 🔥 Three Operating Modes
+### Three Operating Modes
 
 #### 1. Search Mode (`>`)
 
@@ -36,14 +35,14 @@ A spotlight-like terminal interface built with Phoenix LiveView and styled with 
 - Leave the input empty to see available commands and options
 - Shows quick reference for all available functionality
 
-### 📁 Virtual File System
+### Virtual File System
 
 - Persistent file system stored in SQLite database
 - Hierarchical directory structure
 - Support for both files and directories
 - File content is searchable
 
-### ✨ Built-in Text Editor
+### Built-in Text Editor
 
 - Full-screen text editor opens when using `edit` command
 - Syntax highlighting ready (can be extended)
@@ -110,22 +109,6 @@ A spotlight-like terminal interface built with Phoenix LiveView and styled with 
 2. `> Phoenix` - Find files containing "Phoenix"
 3. `> config` - Find configuration files
 
-## Architecture
-
-### Backend
-
-- **Phoenix LiveView** for real-time UI updates
-- **Ecto** for database operations
-- **Custom FileSystem context** for file operations
-- **SQLite/PostgreSQL** for data persistence
-
-### Frontend
-
-- **Tailwind CSS** for styling
-- **JavaScript hooks** for keyboard shortcuts
-- **HEEx templates** for reactive UI
-- **CSS animations** for smooth transitions
-
 ### Key Components
 
 - `TerminalLive` - Main LiveView module
@@ -164,8 +147,6 @@ end
 
 ### Styling
 
-The interface uses Tailwind CSS. Key areas to customize:
-
 - Background gradients in the main template
 - Modal styling and backdrop effects
 - Color schemes for different modes
@@ -180,21 +161,6 @@ Create new migrations:
 ```bash
 mix ecto.gen.migration add_feature
 ```
-
-### Adding Features
-
-1. Update the FileSystem context for new operations
-2. Add corresponding handlers in TerminalLive
-3. Update the UI template as needed
-4. Add tests for new functionality
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests
-5. Submit a pull request
 
 ## License
 

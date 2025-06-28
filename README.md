@@ -46,3 +46,5 @@ By default the modal text field is auto filled with ">" for the intelligent file
 Without the > or $ mode we have the empty mode. In the empty mode we have the "help mode" which shows a dropdown pane of common options to do
 
 The UI looks quite modern like apple's spotlight. The desktop view also looks minimal and is basically just a changing gradient color that is meant to be replaced with a mini app like the text editor or key visualizer when called by the modal searcher
+
+The editor should have a save button that saves the file. At the top left corner.

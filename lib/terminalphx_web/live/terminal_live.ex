@@ -12,15 +12,17 @@ defmodule TerminalphxWeb.TerminalLive do
      socket
      |> assign(:modal_open, false)
      |> assign(:current_directory, "/home")
-     |> assign(:command_input, ">")
+     |> assign(:command_input, "")  # Empty input, mode prefix is visual only
      |> assign(:command_history, [])
      |> assign(:search_results, [])
      |> assign(:mode, :search)  # :search, :shell, :help
      |> assign(:editor_open, false)
      |> assign(:editor_file_path, nil)
      |> assign(:editor_content, "")
-     |> assign(:pane_results, [])
+     |> assign(:pane_results, [])  # This will now be a list of results
+     |> assign(:pane_history, [])  # Track history of pane results
      |> assign(:last_command, "")
+     |> assign(:last_search, "")
      |> assign(:last_search, "")
      |> assign(:key_history, [])
      |> assign(:show_key_visualizer, false)
@@ -34,7 +36,7 @@ defmodule TerminalphxWeb.TerminalLive do
     socket =
       socket
       |> assign(:modal_open, modal_open)
-      |> assign(:command_input, if(modal_open, do: ">", else: ""))
+      |> assign(:command_input, if(modal_open, do: "", else: ""))  # Empty input, mode prefix is visual
       |> assign(:mode, :search)
       |> assign(:search_results, [])
       |> assign(:pane_results, [])
@@ -91,19 +93,18 @@ defmodule TerminalphxWeb.TerminalLive do
 
   @impl true
   def handle_event("execute_command", %{"command" => command}, socket) do
-    # For execution, we need the full command with prefix to determine mode
+    # For execution, we build the full command with prefix for history
     full_command = case socket.assigns.mode do
       :search -> ">" <> command
       :shell -> "$" <> command
       :help -> command
     end
 
-    {mode, cleaned_command} = determine_mode(full_command)
-
-    socket = case mode do
-      :search -> handle_search_command(cleaned_command, socket)
-      :shell -> handle_shell_command(cleaned_command, socket)
-      :help -> handle_help_command(cleaned_command, socket)
+    # But we execute using the current mode and clean command
+    socket = case socket.assigns.mode do
+      :search -> handle_search_command(command, socket)
+      :shell -> handle_shell_command(command, socket)
+      :help -> handle_help_command(command, socket)
     end
 
     # Add to history and reset input only if modal is still open
@@ -134,7 +135,7 @@ defmodule TerminalphxWeb.TerminalLive do
      |> assign(:editor_file_path, nil)
      |> assign(:editor_content, "")
      |> assign(:modal_open, true)  # Reopen modal when closing editor
-     |> assign(:command_input, ">")
+     |> assign(:command_input, "")  # Empty input, mode prefix is visual
      |> assign(:mode, :search)
     }
   end
@@ -173,11 +174,12 @@ defmodule TerminalphxWeb.TerminalLive do
 
   @impl true
   def handle_event("switch_mode", %{"mode" => mode}, socket) do
+    # Don't include mode prefix in input - it's shown visually
     {new_input, new_mode} = case mode do
-      "search" -> {">", :search}
-      "shell" -> {"$", :shell}
+      "search" -> {"", :search}
+      "shell" -> {"", :shell}
       "help" -> {"", :help}
-      _ -> {">", :search}
+      _ -> {"", :search}
     end
 
     socket = socket
@@ -202,27 +204,17 @@ defmodule TerminalphxWeb.TerminalLive do
   # Private functions
 
   defp determine_mode_from_input(command, current_mode) do
+    # Since mode prefixes are visual only, input never contains them
+    # The mode is determined by current mode state, not input content
     cond do
-      String.starts_with?(command, ">") ->
-        {:search, String.slice(command, 1..-1//1) |> String.trim()}
-      String.starts_with?(command, "$") ->
-        {:shell, String.slice(command, 1..-1//1) |> String.trim()}
-      command == "" ->
+      command == "" and current_mode == :help ->
         {:help, ""}
-      # If user types without prefix and we're in a specific mode, stay in that mode
-      current_mode in [:search, :shell] ->
-        {current_mode, command}
+      command == "" ->
+        # Empty input keeps current mode
+        {current_mode, ""}
       true ->
-        {:help, command}
-    end
-  end
-
-  defp determine_mode(command) do
-    cond do
-      String.starts_with?(command, ">") -> {:search, String.slice(command, 1..-1//1) |> String.trim()}
-      String.starts_with?(command, "$") -> {:shell, String.slice(command, 1..-1//1) |> String.trim()}
-      command == "" -> {:help, ""}
-      true -> {:help, command}
+        # Non-empty input stays in current mode
+        {current_mode, command}
     end
   end
 
@@ -265,15 +257,20 @@ defmodule TerminalphxWeb.TerminalLive do
 
     socket = case result do
       {:ok, data} ->
+        # Add new result to the top of the pane_results list (limit to 5 results)
+        new_pane_results = [data | socket.assigns.pane_results] |> Enum.take(5)
         socket
-        |> assign(:pane_results, data)
+        |> assign(:pane_results, new_pane_results)
         |> assign(:search_results, [])  # Clear search results when showing shell results
         |> assign(:last_command, command)
         # Keep modal open to show results
 
       {:error, message} ->
+        # Add error result to the top of the pane_results list (limit to 5 results)
+        error_data = %{type: :message, content: "Error: #{message}"}
+        new_pane_results = [error_data | socket.assigns.pane_results] |> Enum.take(5)
         socket
-        |> put_flash(:error, message)
+        |> assign(:pane_results, new_pane_results)
         |> assign(:last_command, command)
         # Keep modal open to show error
 

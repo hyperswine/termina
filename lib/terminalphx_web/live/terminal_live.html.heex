@@ -56,7 +56,17 @@
     <!-- Text Editor -->
     <div class={["fixed inset-4 bg-gray-900 rounded-lg shadow-2xl", !@editor_open && "hidden"]}>
       <div class="flex items-center justify-between p-4 border-b border-gray-700">
-        <h3 class="text-white font-medium"><%= @editor_file_path %></h3>
+        <div class="flex items-center space-x-3">
+          <button
+            id="save-button-top"
+            type="button"
+            onclick="document.querySelector('form[phx-submit=save_file] button[type=submit]').click()"
+            class="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition-colors"
+          >
+            Save
+          </button>
+          <h3 class="text-white font-medium"><%= @editor_file_path %></h3>
+        </div>
         <button
           phx-click="close_editor"
           class="text-gray-400 hover:text-white transition-colors"
@@ -199,74 +209,78 @@
         </div>
       <% end %>
 
-      <!-- Pane Results (for commands like ls) -->
-      <%= if @pane_results != [] do %>
-        <div class="bg-black/20 rounded-lg p-4 max-h-96 overflow-y-auto">
-          <%= case @pane_results.type do %>
-            <% :file_list -> %>
-              <div class="text-white/60 text-sm mb-2">Contents of <%= @pane_results.path %>:</div>
-              <div class="space-y-2">
-                <%= for file_item <- @pane_results.files do %>
-                  <div class="flex items-center space-x-3 text-white/80">
-                    <div class="flex-shrink-0 w-5 h-5">
-                      <%= if file_item.is_directory do %>
-                        <svg class="w-5 h-5 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
-                          <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"></path>
-                        </svg>
-                      <% else %>
-                        <svg class="w-5 h-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-                          <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clip-rule="evenodd"></path>
-                        </svg>
-                      <% end %>
-                    </div>
-                    <div class="flex-1">
-                      <div class="font-medium"><%= file_item.name %></div>
-                    </div>
-                    <div class="text-xs text-white/50">
-                      <%= if file_item.is_directory, do: "dir", else: "file" %>
-                    </div>
+      <!-- Pane Results (for commands like ls) - Now displays stacked results -->
+      <%= if length(@pane_results) > 0 do %>
+        <div class="space-y-4 max-h-96 overflow-y-auto">
+          <%= for pane_result <- @pane_results do %>
+            <div class="bg-black/20 rounded-lg p-4">
+              <%= case pane_result.type do %>
+                <% :file_list -> %>
+                  <div class="text-white/60 text-sm mb-2">Contents of <%= pane_result.path %>:</div>
+                  <div class="space-y-2">
+                    <%= for file_item <- pane_result.files do %>
+                      <div class="flex items-center space-x-3 text-white/80">
+                        <div class="flex-shrink-0 w-5 h-5">
+                          <%= if file_item.is_directory do %>
+                            <svg class="w-5 h-5 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                              <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"></path>
+                            </svg>
+                          <% else %>
+                            <svg class="w-5 h-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                              <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clip-rule="evenodd"></path>
+                            </svg>
+                          <% end %>
+                        </div>
+                        <div class="flex-1">
+                          <div class="font-medium"><%= file_item.name %></div>
+                        </div>
+                        <div class="text-xs text-white/50">
+                          <%= if file_item.is_directory, do: "dir", else: "file" %>
+                        </div>
+                      </div>
+                    <% end %>
                   </div>
-                <% end %>
-              </div>
 
-            <% :file_list_recursive -> %>
-              <div class="text-white/60 text-sm mb-2">Contents of <%= @pane_results.path %> (nesting: <%= @pane_results.nesting %>):</div>
-              <div class="space-y-1">
-                <%= for file_rec <- flatten_recursive_files(@pane_results.files, 0) do %>
-                  <div class={["flex items-center space-x-3 text-white/80", "ml-#{file_rec.indent * 4}"]}>
-                    <div class="flex-shrink-0 w-5 h-5">
-                      <%= if file_rec.is_directory do %>
-                        <svg class="w-5 h-5 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
-                          <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"></path>
-                        </svg>
-                      <% else %>
-                        <svg class="w-5 h-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-                          <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clip-rule="evenodd"></path>
-                        </svg>
-                      <% end %>
-                    </div>
-                    <div class="flex-1">
-                      <div class="font-medium"><%= file_rec.name %></div>
-                    </div>
-                    <div class="text-xs text-white/50">
-                      <%= if file_rec.is_directory, do: "dir", else: "file" %>
-                    </div>
+                <% :file_list_recursive -> %>
+                  <div class="text-white/60 text-sm mb-2">Contents of <%= pane_result.path %> (nesting: <%= pane_result.nesting %>):</div>
+                  <div class="space-y-1">
+                    <%= for file_rec <- flatten_recursive_files(pane_result.files, 0) do %>
+                      <div class={["flex items-center space-x-3 text-white/80", "ml-#{file_rec.indent * 4}"]}>
+                        <div class="flex-shrink-0 w-5 h-5">
+                          <%= if file_rec.is_directory do %>
+                            <svg class="w-5 h-5 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                              <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"></path>
+                            </svg>
+                          <% else %>
+                            <svg class="w-5 h-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                              <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clip-rule="evenodd"></path>
+                            </svg>
+                          <% end %>
+                        </div>
+                        <div class="flex-1">
+                          <div class="font-medium"><%= file_rec.name %></div>
+                        </div>
+                        <div class="text-xs text-white/50">
+                          <%= if file_rec.is_directory, do: "dir", else: "file" %>
+                        </div>
+                      </div>
+                    <% end %>
                   </div>
-                <% end %>
-              </div>
 
-            <% :file_content -> %>
-              <div class="text-white/60 text-sm mb-2">Contents of <%= @pane_results.path %>:</div>
-              <pre class="text-white/80 text-sm bg-black/30 p-3 rounded font-mono whitespace-pre-wrap"><%= @pane_results.content %></pre>
+                <% :file_content -> %>
+                  <div class="text-white/60 text-sm mb-2">Contents of <%= pane_result.path %>:</div>
+                  <pre class="text-white/80 text-sm bg-black/30 p-3 rounded font-mono whitespace-pre-wrap"><%= pane_result.content %></pre>
 
-            <% :cd -> %>
-              <div class="text-green-400 text-sm">Changed directory to: <%= @pane_results.path %></div>
+                <% :cd -> %>
+                  <div class="text-green-400 text-sm">Changed directory to: <%= pane_result.path %></div>
 
-            <% :message -> %>
-              <div class="text-white/80 text-sm"><%= @pane_results.content %></div>
+                <% :message -> %>
+                  <div class="text-white/80 text-sm"><%= pane_result.content %></div>
 
-            <% _ -> %>
-              <div class="text-white/80 text-sm">Command executed successfully</div>
+                <% _ -> %>
+                  <div class="text-white/80 text-sm">Command executed successfully</div>
+              <% end %>
+            </div>
           <% end %>
         </div>
       <% end %>    </div>
