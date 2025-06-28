@@ -111,15 +111,27 @@
       <!-- Mode Indicator -->
       <div class="flex items-center justify-between mb-4 text-white/60 text-sm">
         <div class="flex items-center space-x-4">
-          <span class={["px-2 py-1 rounded", @mode == :search && "bg-green-500/20 text-green-300"]}>
+          <button
+            phx-click="switch_mode"
+            phx-value-mode="search"
+            class={["px-2 py-1 rounded transition-colors hover:bg-white/10 cursor-pointer", @mode == :search && "bg-green-500/20 text-green-300"]}
+          >
             <%= if @mode == :search, do: "🔍 Search Mode", else: "Search Mode" %>
-          </span>
-          <span class={["px-2 py-1 rounded", @mode == :shell && "bg-blue-500/20 text-blue-300"]}>
+          </button>
+          <button
+            phx-click="switch_mode"
+            phx-value-mode="shell"
+            class={["px-2 py-1 rounded transition-colors hover:bg-white/10 cursor-pointer", @mode == :shell && "bg-blue-500/20 text-blue-300"]}
+          >
             <%= if @mode == :shell, do: "💻 Shell Mode", else: "Shell Mode" %>
-          </span>
-          <span class={["px-2 py-1 rounded", @mode == :help && "bg-purple-500/20 text-purple-300"]}>
+          </button>
+          <button
+            phx-click="switch_mode"
+            phx-value-mode="help"
+            class={["px-2 py-1 rounded transition-colors hover:bg-white/10 cursor-pointer", @mode == :help && "bg-purple-500/20 text-purple-300"]}
+          >
             <%= if @mode == :help, do: "❓ Help Mode", else: "Help Mode" %>
-          </span>
+          </button>
         </div>
         <div class="text-xs">
           Current: <span class="text-white"><%= @current_directory %></span>

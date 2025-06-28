@@ -87,15 +87,22 @@ defmodule TerminalphxWeb.TerminalLive do
       :help -> handle_help_command(cleaned_command, socket)
     end
 
-    # Add to history and reset input
+    # Add to history and reset input only if modal is still open
     history = [command | socket.assigns.command_history]
 
-    {:noreply,
-     socket
-     |> assign(:command_history, Enum.take(history, 10))
-     |> assign(:command_input, ">")
-     |> assign(:mode, :search)
-    }
+    final_socket = socket
+    |> assign(:command_history, Enum.take(history, 10))
+
+    # Only reset input and mode if modal is still open (i.e., editor wasn't opened)
+    final_socket = if socket.assigns.modal_open do
+      final_socket
+      |> assign(:command_input, ">")
+      |> assign(:mode, :search)
+    else
+      final_socket
+    end
+
+    {:noreply, final_socket}
   end
 
   @impl true
@@ -105,6 +112,9 @@ defmodule TerminalphxWeb.TerminalLive do
      |> assign(:editor_open, false)
      |> assign(:editor_file_path, nil)
      |> assign(:editor_content, "")
+     |> assign(:modal_open, true)  # Reopen modal when closing editor
+     |> assign(:command_input, ">")
+     |> assign(:mode, :search)
     }
   end
 
@@ -140,6 +150,34 @@ defmodule TerminalphxWeb.TerminalLive do
     {:noreply, assign(socket, :show_key_visualizer, show)}
   end
 
+  @impl true
+  def handle_event("switch_mode", %{"mode" => mode}, socket) do
+    {new_input, new_mode} = case mode do
+      "search" -> {">", :search}
+      "shell" -> {"$", :shell}
+      "help" -> {"", :help}
+      _ -> {">", :search}
+    end
+
+    socket = socket
+    |> assign(:command_input, new_input)
+    |> assign(:mode, new_mode)
+
+    # Set appropriate results based on mode
+    socket = case new_mode do
+      :help ->
+        socket
+        |> assign(:search_results, get_help_options())
+        |> assign(:pane_results, [])
+      _ ->
+        socket
+        |> assign(:search_results, [])
+        |> assign(:pane_results, [])
+    end
+
+    {:noreply, socket}
+  end
+
   # Private functions
 
   defp determine_mode(command) do
@@ -157,10 +195,15 @@ defmodule TerminalphxWeb.TerminalLive do
     socket
     |> assign(:search_results, results)
     |> assign(:last_search, query)
-    |> assign(:modal_open, false)
+    |> assign(:pane_results, [])  # Clear shell results when searching
+    # Keep modal open for search results
   end
 
-  defp handle_search_command(_, socket), do: socket
+  defp handle_search_command(_, socket) do
+    # Clear search results for empty query but keep modal open
+    socket
+    |> assign(:search_results, [])
+  end
 
   defp handle_shell_command(command, socket) do
     [cmd | args] = String.split(command, " ", trim: true)
@@ -187,30 +230,32 @@ defmodule TerminalphxWeb.TerminalLive do
       {:ok, data} ->
         socket
         |> assign(:pane_results, data)
+        |> assign(:search_results, [])  # Clear search results when showing shell results
         |> assign(:last_command, command)
-        |> assign(:modal_open, false)
+        # Keep modal open to show results
 
       {:error, message} ->
         socket
         |> put_flash(:error, message)
         |> assign(:last_command, command)
-        |> assign(:modal_open, false)
+        # Keep modal open to show error
 
       {:edit, path, content} ->
         socket
         |> assign(:editor_open, true)
         |> assign(:editor_file_path, path)
         |> assign(:editor_content, content)
-        |> assign(:modal_open, false)
-
-      _ -> socket
+        |> assign(:modal_open, false)  # Only close modal for edit
     end
 
     socket
   end
 
   defp handle_help_command(_query, socket) do
-    assign(socket, :modal_open, false)
+    # Keep modal open for help and show help results
+    socket
+    |> assign(:search_results, get_help_options())
+    |> assign(:pane_results, [])
   end
 
   defp handle_ls_command([], socket) do
